@@ -32,6 +32,13 @@ public class HousekeepingController {
         return new ResponseEntity<>(operationsService.createTask(request), HttpStatus.CREATED);
     }
 
+    @GetMapping
+    @PreAuthorize("hasAnyRole('HOUSEKEEPER', 'MANAGER', 'OWNER', 'ADMIN')")
+    @Operation(summary = "Get all tasks", description = "Retrieves all housekeeping tasks")
+    public ResponseEntity<List<HousekeepingTaskResponse>> getAllTasks() {
+        return ResponseEntity.ok(operationsService.getMyTasks(null));
+    }
+
     @GetMapping("/my")
     @PreAuthorize("hasAnyRole('HOUSEKEEPER', 'MANAGER', 'OWNER', 'ADMIN')")
     @Operation(summary = "Get my assigned tasks", description = "Retrieves tasks assigned to a specific housekeeper")

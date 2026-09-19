@@ -207,4 +207,57 @@ class OperationsServiceTest {
         assertEquals(new BigDecimal("750.00"), sampleDrawer.getExpectedClosing());
         assertEquals(0, sampleDrawer.getDifference().compareTo(BigDecimal.ZERO));
     }
+
+    @Test
+    @DisplayName("Should progress maintenance: Create (Room MAINTENANCE) -> Accept -> Start -> Resolve (Staff only) -> Verify (Room AVAILABLE)")
+    void testMaintenanceFullLifecycle() {
+        MaintenanceIssue issue = MaintenanceIssue.builder()
+                .id(1L)
+                .issueCode("MAINT-12345678")
+                .roomId(205L)
+                .description("AC cooling leak")
+                .assignedStaffId(10L)
+                .status(MaintenanceStatus.ASSIGNED)
+                .cost(BigDecimal.ZERO)
+                .build();
+
+        when(maintenanceRepository.findById(1L)).thenReturn(Optional.of(issue));
+        when(maintenanceRepository.save(any(MaintenanceIssue.class))).thenReturn(issue);
+
+        // 1. Reject if staffId is null or wrong staffId
+        assertThrows(com.hms.operationsservice.exception.BusinessRuleException.class,
+                () -> operationsService.acceptMaintenance(1L, null));
+        assertThrows(com.hms.operationsservice.exception.BusinessRuleException.class,
+                () -> operationsService.acceptMaintenance(1L, 999L));
+
+        // Accept by Assigned Staff
+        MaintenanceResponse acceptResp = operationsService.acceptMaintenance(1L, 10L);
+        assertNotNull(acceptResp);
+        assertEquals(MaintenanceStatus.ACCEPTED, issue.getStatus());
+
+        // 2. Start by Assigned Staff
+        MaintenanceResponse startResp = operationsService.startMaintenance(1L, 10L);
+        assertNotNull(startResp);
+        assertEquals(MaintenanceStatus.IN_PROGRESS, issue.getStatus());
+
+        // 3. Resolve by Assigned Staff (Forbidden for other staff or null staffId)
+        assertThrows(com.hms.operationsservice.exception.BusinessRuleException.class,
+                () -> operationsService.resolveMaintenance(1L, null, ResolveMaintenanceRequest.builder().cost(new BigDecimal("75.00")).build()));
+        assertThrows(com.hms.operationsservice.exception.BusinessRuleException.class,
+                () -> operationsService.resolveMaintenance(1L, 999L, ResolveMaintenanceRequest.builder().cost(new BigDecimal("75.00")).build()));
+
+        MaintenanceResponse resolveResp = operationsService.resolveMaintenance(1L, 10L,
+                ResolveMaintenanceRequest.builder().cost(new BigDecimal("75.00")).remarks("Fixed compressor seal").build());
+        assertNotNull(resolveResp);
+        assertEquals(MaintenanceStatus.RESOLVED, issue.getStatus());
+        assertEquals(new BigDecimal("75.00"), issue.getCost());
+        assertNotNull(issue.getResolvedAt());
+
+        // 4. Verify by Manager -> Room status set to AVAILABLE
+        MaintenanceResponse verifyResp = operationsService.verifyMaintenance(1L, 2L);
+        assertNotNull(verifyResp);
+        assertEquals(MaintenanceStatus.VERIFIED, issue.getStatus());
+        assertEquals(2L, issue.getVerifiedByManagerId());
+        verify(roomClient, times(1)).updateRoomStatus(205L, Map.of("status", "AVAILABLE"));
+    }
 }

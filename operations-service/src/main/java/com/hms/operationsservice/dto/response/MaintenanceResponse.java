@@ -21,6 +21,8 @@ public class MaintenanceResponse {
     private BigDecimal cost;
     private String reportedBy;
     private LocalDateTime resolvedAt;
+    private Long verifiedByManagerId;
+    private String remarks;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

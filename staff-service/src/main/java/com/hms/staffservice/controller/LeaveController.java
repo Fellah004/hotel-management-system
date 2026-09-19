@@ -21,28 +21,32 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/leave")
 @RequiredArgsConstructor
-@Tag(name = "Leave Management", description = "Endpoints for staff leave requests and manager approvals")
+@Tag(name = "Leave Management", description = "Endpoints for staff leave requests and admin/owner approvals")
 @SecurityRequirement(name = "bearerAuth")
 public class LeaveController {
 
     private final LeaveService leaveService;
 
     @PostMapping
-    @Operation(summary = "Submit leave request", description = "Staff member submits a leave application")
-    public ResponseEntity<LeaveResponse> requestLeave(@Valid @RequestBody LeaveRequest request) {
-        LeaveResponse response = leaveService.requestLeave(request);
+    @PreAuthorize("hasAnyRole('RECEPTIONIST', 'HOUSEKEEPER', 'MANAGER')")
+    @Operation(summary = "Submit leave request", description = "Receptionist, Housekeeper, or Manager submits a leave application for themselves")
+    public ResponseEntity<LeaveResponse> requestLeave(
+            @Valid @RequestBody LeaveRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        Long currentUserId = principal != null ? principal.getId() : null;
+        LeaveResponse response = leaveService.requestLeave(request, currentUserId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PutMapping("/{id}/approval")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'MANAGER')")
-    @Operation(summary = "Approve or reject leave", description = "Manager/Owner approves or rejects a pending leave request")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER')")
+    @Operation(summary = "Approve or reject leave", description = "Admin or Owner approves or rejects a pending leave request")
     public ResponseEntity<LeaveResponse> approveOrRejectLeave(
             @PathVariable Long id,
             @Valid @RequestBody LeaveApprovalRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        Long approverStaffId = principal != null ? principal.getId() : null;
-        return ResponseEntity.ok(leaveService.approveOrRejectLeave(id, request, approverStaffId));
+        Long approverUserId = principal != null ? principal.getId() : null;
+        return ResponseEntity.ok(leaveService.approveOrRejectLeave(id, request, approverUserId));
     }
 
     @GetMapping("/{id}")

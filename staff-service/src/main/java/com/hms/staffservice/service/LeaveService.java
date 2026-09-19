@@ -8,6 +8,7 @@ import java.util.List;
 
 public interface LeaveService {
     LeaveResponse requestLeave(LeaveRequest request);
+    LeaveResponse requestLeave(LeaveRequest request, Long currentUserId);
     LeaveResponse approveOrRejectLeave(Long leaveId, LeaveApprovalRequest request, Long approverStaffId);
     LeaveResponse getLeaveById(Long id);
     List<LeaveResponse> getLeavesByStaff(Long staffId);

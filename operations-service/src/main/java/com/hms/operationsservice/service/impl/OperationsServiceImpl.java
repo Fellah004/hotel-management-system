@@ -216,6 +216,7 @@ public class OperationsServiceImpl implements OperationsService {
         HousekeepingTask saved = taskRepository.save(task);
 
         recordTaskHistory(saved.getId(), oldStatus, TaskStatus.REJECTED, "STAFF_" + staffId, remarks);
+        eventPublisher.publishTaskRejected(saved, staffId);
         return mapToTaskResponse(saved);
     }
 
@@ -309,12 +310,16 @@ public class OperationsServiceImpl implements OperationsService {
         log.info("Reporting maintenance issue for roomId: {}", request.getRoomId());
 
         String code = "MAINT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        MaintenanceStatus initialStatus = request.getAssignedStaffId() != null 
+                ? MaintenanceStatus.ASSIGNED 
+                : MaintenanceStatus.OPEN;
 
         MaintenanceIssue issue = MaintenanceIssue.builder()
                 .issueCode(code)
                 .roomId(request.getRoomId())
                 .description(request.getDescription())
-                .status(MaintenanceStatus.OPEN)
+                .status(initialStatus)
+                .assignedStaffId(request.getAssignedStaffId())
                 .cost(BigDecimal.ZERO)
                 .reportedBy(request.getReportedBy() != null ? request.getReportedBy() : "STAFF")
                 .build();
@@ -358,6 +363,113 @@ public class OperationsServiceImpl implements OperationsService {
 
     @Override
     @Transactional
+    public MaintenanceResponse acceptMaintenance(Long id, Long staffId) {
+        MaintenanceIssue issue = maintenanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Maintenance issue not found with id: " + id));
+
+        if (staffId == null) {
+            throw new BusinessRuleException("Staff ID is required to accept this maintenance task.");
+        }
+
+        if (issue.getAssignedStaffId() != null && !issue.getAssignedStaffId().equals(staffId)) {
+            throw new BusinessRuleException("Access denied: Only the assigned staff member (Staff ID: " + issue.getAssignedStaffId() + ") can accept this maintenance task.");
+        }
+
+        if (issue.getStatus() != MaintenanceStatus.ASSIGNED && issue.getStatus() != MaintenanceStatus.OPEN && issue.getStatus() != MaintenanceStatus.REJECTED) {
+            throw new BusinessRuleException("Cannot accept maintenance issue with status: " + issue.getStatus());
+        }
+
+        if (issue.getAssignedStaffId() == null) {
+            issue.setAssignedStaffId(staffId);
+        }
+
+        issue.setStatus(MaintenanceStatus.ACCEPTED);
+        MaintenanceIssue saved = maintenanceRepository.save(issue);
+        return mapToMaintenanceResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public MaintenanceResponse startMaintenance(Long id, Long staffId) {
+        MaintenanceIssue issue = maintenanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Maintenance issue not found with id: " + id));
+
+        validateMaintenanceOwnership(issue, staffId);
+
+        if (issue.getStatus() != MaintenanceStatus.ACCEPTED && issue.getStatus() != MaintenanceStatus.ASSIGNED) {
+            throw new BusinessRuleException("Cannot start maintenance issue with status: " + issue.getStatus());
+        }
+
+        issue.setStatus(MaintenanceStatus.IN_PROGRESS);
+        MaintenanceIssue saved = maintenanceRepository.save(issue);
+        return mapToMaintenanceResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public MaintenanceResponse rejectMaintenance(Long id, Long staffId, String remarks) {
+        MaintenanceIssue issue = maintenanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Maintenance issue not found with id: " + id));
+
+        validateMaintenanceOwnership(issue, staffId);
+
+        issue.setStatus(MaintenanceStatus.REJECTED);
+        if (remarks != null && !remarks.isBlank()) {
+            issue.setRemarks(remarks);
+        }
+        MaintenanceIssue saved = maintenanceRepository.save(issue);
+        return mapToMaintenanceResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public MaintenanceResponse resolveMaintenance(Long id, Long staffId, ResolveMaintenanceRequest request) {
+        MaintenanceIssue issue = maintenanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Maintenance issue not found with id: " + id));
+
+        validateMaintenanceOwnership(issue, staffId);
+
+        if (issue.getStatus() != MaintenanceStatus.IN_PROGRESS && issue.getStatus() != MaintenanceStatus.ACCEPTED && issue.getStatus() != MaintenanceStatus.ASSIGNED) {
+            throw new BusinessRuleException("Cannot resolve maintenance issue with status: " + issue.getStatus());
+        }
+
+        issue.setStatus(MaintenanceStatus.RESOLVED);
+        issue.setResolvedAt(LocalDateTime.now());
+        if (request != null) {
+            if (request.getCost() != null) {
+                issue.setCost(request.getCost());
+            }
+            if (request.getRemarks() != null && !request.getRemarks().isBlank()) {
+                issue.setRemarks(request.getRemarks());
+            }
+        }
+
+        MaintenanceIssue saved = maintenanceRepository.save(issue);
+        return mapToMaintenanceResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public MaintenanceResponse verifyMaintenance(Long id, Long managerId) {
+        MaintenanceIssue issue = maintenanceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Maintenance issue not found with id: " + id));
+
+        if (issue.getStatus() != MaintenanceStatus.RESOLVED && issue.getStatus() != MaintenanceStatus.INSPECTION) {
+            throw new BusinessRuleException("Cannot verify maintenance issue that is not in RESOLVED status. Current status: " + issue.getStatus());
+        }
+
+        issue.setStatus(MaintenanceStatus.VERIFIED);
+        issue.setVerifiedByManagerId(managerId != null ? managerId : 1L);
+
+        // Put room back to AVAILABLE
+        updateRoomStatus(issue.getRoomId(), "AVAILABLE");
+
+        MaintenanceIssue saved = maintenanceRepository.save(issue);
+        return mapToMaintenanceResponse(saved);
+    }
+
+    @Override
+    @Transactional
     public MaintenanceResponse updateMaintenanceStatus(Long id, UpdateMaintenanceStatusRequest request) {
         MaintenanceIssue issue = maintenanceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Maintenance issue not found with id: " + id));
@@ -366,9 +478,9 @@ public class OperationsServiceImpl implements OperationsService {
         if (request.getCost() != null) {
             issue.setCost(request.getCost());
         }
-        if (request.getStatus() == MaintenanceStatus.RESOLVED || request.getStatus() == MaintenanceStatus.AVAILABLE) {
+        if (request.getStatus() == MaintenanceStatus.RESOLVED || request.getStatus() == MaintenanceStatus.AVAILABLE || request.getStatus() == MaintenanceStatus.VERIFIED) {
             issue.setResolvedAt(LocalDateTime.now());
-            if (request.getStatus() == MaintenanceStatus.AVAILABLE) {
+            if (request.getStatus() == MaintenanceStatus.AVAILABLE || request.getStatus() == MaintenanceStatus.VERIFIED) {
                 updateRoomStatus(issue.getRoomId(), "AVAILABLE");
             }
         }
@@ -694,9 +806,23 @@ public class OperationsServiceImpl implements OperationsService {
                 .cost(m.getCost())
                 .reportedBy(m.getReportedBy())
                 .resolvedAt(m.getResolvedAt())
+                .verifiedByManagerId(m.getVerifiedByManagerId())
+                .remarks(m.getRemarks())
                 .createdAt(m.getCreatedAt())
                 .updatedAt(m.getUpdatedAt())
                 .build();
+    }
+
+    private void validateMaintenanceOwnership(MaintenanceIssue issue, Long staffId) {
+        if (staffId == null) {
+            throw new BusinessRuleException("Staff ID is required to perform actions on this maintenance task.");
+        }
+        if (issue.getAssignedStaffId() == null) {
+            throw new BusinessRuleException("This maintenance task has not been assigned to any staff member yet.");
+        }
+        if (!issue.getAssignedStaffId().equals(staffId)) {
+            throw new BusinessRuleException("Access denied: Only the assigned staff member (Staff ID: " + issue.getAssignedStaffId() + ") can perform actions on this maintenance task.");
+        }
     }
 
     private BreakageResponse mapToBreakageResponse(BreakageReport b) {

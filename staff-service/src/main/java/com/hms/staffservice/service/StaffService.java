@@ -14,6 +14,7 @@ public interface StaffService {
     StaffResponse getStaffByUserId(Long userId, String currentUserRole);
     List<StaffResponse> getAllStaff(String currentUserRole);
     List<StaffResponse> getStaffByRole(StaffRole role, String currentUserRole);
+    StaffResponse updateStaff(Long id, UpdateStaffRequest request, Long currentUserId, String currentUserRole);
     StaffResponse updateStaff(Long id, UpdateStaffRequest request, String currentUserRole);
     void deleteStaff(Long id);
 }

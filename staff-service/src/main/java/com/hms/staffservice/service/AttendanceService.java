@@ -9,7 +9,9 @@ import java.util.List;
 public interface AttendanceService {
     AttendanceResponse recordAttendance(AttendanceRequest request);
     AttendanceResponse checkIn(Long staffId, Long shiftId);
+    AttendanceResponse checkIn(Long staffId, Long shiftId, Long currentUserId, String userRole);
     AttendanceResponse checkOut(Long staffId);
+    AttendanceResponse checkOut(Long staffId, Long currentUserId, String userRole);
     List<AttendanceResponse> getAttendanceByStaff(Long staffId);
     List<AttendanceResponse> getAttendanceByDate(LocalDate date);
 }

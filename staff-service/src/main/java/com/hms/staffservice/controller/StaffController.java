@@ -77,14 +77,15 @@ public class StaffController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'MANAGER')")
-    @Operation(summary = "Update staff profile", description = "Updates staff details")
+    @PreAuthorize("hasAnyRole('ADMIN', 'OWNER', 'MANAGER', 'RECEPTIONIST', 'HOUSEKEEPER', 'STAFF', 'MAINTENANCE_STAFF')")
+    @Operation(summary = "Update staff profile", description = "Updates staff details (Admin/Owner can update any; Staff can only update their own profile without changing role/salary)")
     public ResponseEntity<StaffResponse> updateStaff(
             @PathVariable Long id,
             @Valid @RequestBody UpdateStaffRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
         String userRole = principal != null ? principal.getRole() : "ANONYMOUS";
-        return ResponseEntity.ok(staffService.updateStaff(id, request, userRole));
+        Long currentUserId = principal != null ? principal.getId() : null;
+        return ResponseEntity.ok(staffService.updateStaff(id, request, currentUserId, userRole));
     }
 
     @DeleteMapping("/{id}")

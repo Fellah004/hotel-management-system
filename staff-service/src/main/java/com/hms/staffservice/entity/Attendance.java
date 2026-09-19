@@ -38,6 +38,8 @@ public class Attendance {
 
     private Long shiftId;
 
+    private Double workHours;
+
     private String remarks;
 
     @CreationTimestamp

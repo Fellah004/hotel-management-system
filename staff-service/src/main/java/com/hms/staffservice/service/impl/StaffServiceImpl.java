@@ -5,6 +5,7 @@ import com.hms.staffservice.dto.request.UpdateStaffRequest;
 import com.hms.staffservice.dto.response.StaffResponse;
 import com.hms.staffservice.entity.Staff;
 import com.hms.staffservice.entity.StaffRole;
+import com.hms.staffservice.exception.BusinessRuleException;
 import com.hms.staffservice.exception.DuplicateResourceException;
 import com.hms.staffservice.exception.ResourceNotFoundException;
 import com.hms.staffservice.repository.StaffRepository;
@@ -100,8 +101,38 @@ public class StaffServiceImpl implements StaffService {
     @Override
     @Transactional
     public StaffResponse updateStaff(Long id, UpdateStaffRequest request, String currentUserRole) {
+        return updateStaff(id, request, null, currentUserRole);
+    }
+
+    @Override
+    @Transactional
+    public StaffResponse updateStaff(Long id, UpdateStaffRequest request, Long currentUserId, String currentUserRole) {
         Staff staff = staffRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Staff not found with id: " + id));
+
+        boolean isAdminOrOwner = "ADMIN".equalsIgnoreCase(currentUserRole) || "OWNER".equalsIgnoreCase(currentUserRole);
+
+        // 1. Strict Self-Update Ownership Validation for non-admin/non-owner
+        if (!isAdminOrOwner) {
+            if (currentUserId == null || staff.getUserId() == null || !staff.getUserId().equals(currentUserId)) {
+                throw new BusinessRuleException("Access denied: You are only permitted to update your own staff profile.");
+            }
+
+            // 2. Prevent role elevation / role alteration by staff
+            if (request.getRole() != null && request.getRole() != staff.getRole()) {
+                throw new BusinessRuleException("Staff members are not permitted to change their assigned role.");
+            }
+
+            // 3. Prevent salary modification by staff
+            if (request.getSalary() != null && !request.getSalary().equals(staff.getSalary())) {
+                throw new BusinessRuleException("Staff members are not permitted to modify their own salary.");
+            }
+
+            // 4. Prevent employment status alteration by staff
+            if (request.getActive() != null && !request.getActive().equals(staff.isActive())) {
+                throw new BusinessRuleException("Staff members are not permitted to alter active employment status.");
+            }
+        }
 
         if (request.getEmail() != null && !request.getEmail().equalsIgnoreCase(staff.getEmail())) {
             if (staffRepository.existsByEmail(request.getEmail())) {
@@ -119,12 +150,16 @@ public class StaffServiceImpl implements StaffService {
 
         if (request.getFullName() != null) staff.setFullName(request.getFullName());
         if (request.getAddress() != null) staff.setAddress(request.getAddress());
-        if (request.getSalary() != null) staff.setSalary(request.getSalary());
         if (request.getAge() != null) staff.setAge(request.getAge());
         if (request.getOccupation() != null) staff.setOccupation(request.getOccupation());
         if (request.getPhone() != null) staff.setPhone(request.getPhone());
-        if (request.getRole() != null) staff.setRole(request.getRole());
-        if (request.getActive() != null) staff.setActive(request.getActive());
+
+        // Admin/Owner only privileged fields
+        if (isAdminOrOwner) {
+            if (request.getSalary() != null) staff.setSalary(request.getSalary());
+            if (request.getRole() != null) staff.setRole(request.getRole());
+            if (request.getActive() != null) staff.setActive(request.getActive());
+        }
 
         Staff updated = staffRepository.save(staff);
         log.info("Updated staff id: {}", id);

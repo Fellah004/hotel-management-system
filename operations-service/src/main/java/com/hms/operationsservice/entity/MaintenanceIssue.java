@@ -46,6 +46,11 @@ public class MaintenanceIssue {
 
     private LocalDateTime resolvedAt;
 
+    private Long verifiedByManagerId;
+
+    @Column(length = 500)
+    private String remarks;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -18,4 +18,6 @@ public class CreateMaintenanceRequest {
     private String description;
 
     private String reportedBy;
+
+    private Long assignedStaffId;
 }

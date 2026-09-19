@@ -22,6 +22,7 @@ public class AttendanceResponse {
     private LocalTime checkOutTime;
     private AttendanceStatus status;
     private Long shiftId;
+    private Double workHours;
     private String remarks;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

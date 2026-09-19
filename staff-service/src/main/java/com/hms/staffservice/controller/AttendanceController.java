@@ -3,6 +3,7 @@ package com.hms.staffservice.controller;
 import com.hms.staffservice.dto.request.AttendanceRequest;
 import com.hms.staffservice.dto.response.AttendanceResponse;
 import com.hms.staffservice.service.AttendanceService;
+import com.hms.staffservice.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,6 +13,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -38,14 +40,21 @@ public class AttendanceController {
     @Operation(summary = "Clock-in", description = "Staff member clocks in for their shift")
     public ResponseEntity<AttendanceResponse> checkIn(
             @PathVariable Long staffId,
-            @RequestParam(required = false) Long shiftId) {
-        return ResponseEntity.ok(attendanceService.checkIn(staffId, shiftId));
+            @RequestParam(required = false) Long shiftId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        Long currentUserId = principal != null ? principal.getId() : null;
+        String userRole = principal != null ? principal.getRole() : null;
+        return ResponseEntity.ok(attendanceService.checkIn(staffId, shiftId, currentUserId, userRole));
     }
 
     @PostMapping("/check-out/{staffId}")
     @Operation(summary = "Clock-out", description = "Staff member clocks out at end of shift")
-    public ResponseEntity<AttendanceResponse> checkOut(@PathVariable Long staffId) {
-        return ResponseEntity.ok(attendanceService.checkOut(staffId));
+    public ResponseEntity<AttendanceResponse> checkOut(
+            @PathVariable Long staffId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        Long currentUserId = principal != null ? principal.getId() : null;
+        String userRole = principal != null ? principal.getRole() : null;
+        return ResponseEntity.ok(attendanceService.checkOut(staffId, currentUserId, userRole));
     }
 
     @GetMapping("/staff/{staffId}")

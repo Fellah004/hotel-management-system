@@ -115,4 +115,74 @@ class StaffServiceTest {
         assertNull(response.getSalary());
         assertEquals("********", response.getNic());
     }
+
+    @Test
+    void updateStaff_StaffSelfUpdate_Success() {
+        when(staffRepository.findById(1L)).thenReturn(Optional.of(sampleStaff));
+        when(staffRepository.save(any(Staff.class))).thenReturn(sampleStaff);
+
+        com.hms.staffservice.dto.request.UpdateStaffRequest updateReq = com.hms.staffservice.dto.request.UpdateStaffRequest.builder()
+                .phone("+9876543210")
+                .address("456 New Avenue")
+                .build();
+
+        StaffResponse response = staffService.updateStaff(1L, updateReq, 10L, "HOUSEKEEPER");
+
+        assertNotNull(response);
+        assertEquals("456 New Avenue", sampleStaff.getAddress());
+        assertEquals("+9876543210", sampleStaff.getPhone());
+    }
+
+    @Test
+    void updateStaff_StaffAttemptingRoleChange_ThrowsBusinessRuleException() {
+        when(staffRepository.findById(1L)).thenReturn(Optional.of(sampleStaff));
+
+        com.hms.staffservice.dto.request.UpdateStaffRequest updateReq = com.hms.staffservice.dto.request.UpdateStaffRequest.builder()
+                .role(StaffRole.MANAGER)
+                .build();
+
+        assertThrows(com.hms.staffservice.exception.BusinessRuleException.class,
+                () -> staffService.updateStaff(1L, updateReq, 10L, "HOUSEKEEPER"));
+    }
+
+    @Test
+    void updateStaff_StaffAttemptingSalaryChange_ThrowsBusinessRuleException() {
+        when(staffRepository.findById(1L)).thenReturn(Optional.of(sampleStaff));
+
+        com.hms.staffservice.dto.request.UpdateStaffRequest updateReq = com.hms.staffservice.dto.request.UpdateStaffRequest.builder()
+                .salary(new BigDecimal("99999.00"))
+                .build();
+
+        assertThrows(com.hms.staffservice.exception.BusinessRuleException.class,
+                () -> staffService.updateStaff(1L, updateReq, 10L, "HOUSEKEEPER"));
+    }
+
+    @Test
+    void updateStaff_OtherStaffProfile_ThrowsBusinessRuleException() {
+        when(staffRepository.findById(1L)).thenReturn(Optional.of(sampleStaff));
+
+        com.hms.staffservice.dto.request.UpdateStaffRequest updateReq = com.hms.staffservice.dto.request.UpdateStaffRequest.builder()
+                .fullName("Hacker")
+                .build();
+
+        assertThrows(com.hms.staffservice.exception.BusinessRuleException.class,
+                () -> staffService.updateStaff(1L, updateReq, 999L, "HOUSEKEEPER"));
+    }
+
+    @Test
+    void updateStaff_Admin_CanUpdateRoleAndSalary() {
+        when(staffRepository.findById(1L)).thenReturn(Optional.of(sampleStaff));
+        when(staffRepository.save(any(Staff.class))).thenReturn(sampleStaff);
+
+        com.hms.staffservice.dto.request.UpdateStaffRequest updateReq = com.hms.staffservice.dto.request.UpdateStaffRequest.builder()
+                .role(StaffRole.MANAGER)
+                .salary(new BigDecimal("5000.00"))
+                .build();
+
+        StaffResponse response = staffService.updateStaff(1L, updateReq, 1L, "ADMIN");
+
+        assertNotNull(response);
+        assertEquals(StaffRole.MANAGER, sampleStaff.getRole());
+        assertEquals(new BigDecimal("5000.00"), sampleStaff.getSalary());
+    }
 }

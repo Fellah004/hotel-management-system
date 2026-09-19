@@ -3,10 +3,15 @@ package com.hms.staffservice.service.impl;
 import com.hms.staffservice.dto.request.LeaveApprovalRequest;
 import com.hms.staffservice.dto.request.LeaveRequest;
 import com.hms.staffservice.dto.response.LeaveResponse;
+import com.hms.staffservice.entity.Attendance;
+import com.hms.staffservice.entity.AttendanceStatus;
 import com.hms.staffservice.entity.LeaveStatus;
+import com.hms.staffservice.entity.Staff;
 import com.hms.staffservice.entity.StaffLeave;
+import com.hms.staffservice.entity.StaffRole;
 import com.hms.staffservice.exception.BusinessRuleException;
 import com.hms.staffservice.exception.ResourceNotFoundException;
+import com.hms.staffservice.repository.AttendanceRepository;
 import com.hms.staffservice.repository.StaffLeaveRepository;
 import com.hms.staffservice.repository.StaffRepository;
 import com.hms.staffservice.service.LeaveService;
@@ -15,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,12 +31,28 @@ public class LeaveServiceImpl implements LeaveService {
 
     private final StaffLeaveRepository leaveRepository;
     private final StaffRepository staffRepository;
+    private final AttendanceRepository attendanceRepository;
 
     @Override
     @Transactional
     public LeaveResponse requestLeave(LeaveRequest request) {
-        if (!staffRepository.existsById(request.getStaffId())) {
-            throw new ResourceNotFoundException("Staff not found with id: " + request.getStaffId());
+        return requestLeave(request, null);
+    }
+
+    @Override
+    @Transactional
+    public LeaveResponse requestLeave(LeaveRequest request, Long currentUserId) {
+        Staff staff = staffRepository.findById(request.getStaffId())
+                .orElseThrow(() -> new ResourceNotFoundException("Staff not found with id: " + request.getStaffId()));
+
+        // Only RECEPTIONIST, HOUSEKEEPER, and MANAGER are permitted to apply for leave
+        if (staff.getRole() == StaffRole.ADMIN || staff.getRole() == StaffRole.OWNER) {
+            throw new BusinessRuleException("Only Receptionist, Housekeeper, and Manager are permitted to apply for leave.");
+        }
+
+        // Ownership validation: Staff can only submit leave applications for their own account
+        if (currentUserId != null && staff.getUserId() != null && !staff.getUserId().equals(currentUserId)) {
+            throw new BusinessRuleException("Access denied: You are only permitted to submit leave requests for yourself.");
         }
 
         if (request.getEndDate().isBefore(request.getStartDate())) {
@@ -47,7 +69,7 @@ public class LeaveServiceImpl implements LeaveService {
                 .build();
 
         StaffLeave saved = leaveRepository.save(leave);
-        log.info("Submitted leave request for staff id: {}", request.getStaffId());
+        log.info("Submitted leave request for staff id: {} (Role: {})", request.getStaffId(), staff.getRole());
         return mapToResponse(saved);
     }
 
@@ -66,6 +88,26 @@ public class LeaveServiceImpl implements LeaveService {
         leave.setRemarks(request.getRemarks());
 
         StaffLeave updated = leaveRepository.save(leave);
+
+        // Automatically sync attendance roster if leave is APPROVED
+        if (request.getStatus() == LeaveStatus.APPROVED) {
+            LocalDate current = leave.getStartDate();
+            while (!current.isAfter(leave.getEndDate())) {
+                LocalDate date = current;
+                Attendance attendance = attendanceRepository.findByStaffIdAndDate(leave.getStaffId(), date)
+                        .orElse(Attendance.builder()
+                                .staffId(leave.getStaffId())
+                                .date(date)
+                                .build());
+                attendance.setStatus(AttendanceStatus.ON_LEAVE);
+                attendance.setRemarks("Approved Leave: " + leave.getLeaveType());
+                attendanceRepository.save(attendance);
+                current = current.plusDays(1);
+            }
+            log.info("Automatically marked attendance as ON_LEAVE for staff {} from {} to {}",
+                    leave.getStaffId(), leave.getStartDate(), leave.getEndDate());
+        }
+
         log.info("Leave request {} updated to status {}", leaveId, request.getStatus());
         return mapToResponse(updated);
     }

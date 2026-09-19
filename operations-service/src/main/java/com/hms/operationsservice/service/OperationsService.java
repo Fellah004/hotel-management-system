@@ -28,6 +28,11 @@ public interface OperationsService {
     List<MaintenanceResponse> getAllMaintenanceIssues();
     MaintenanceResponse getMaintenanceIssueById(Long id);
     MaintenanceResponse assignMaintenance(Long id, AssignMaintenanceRequest request);
+    MaintenanceResponse acceptMaintenance(Long id, Long staffId);
+    MaintenanceResponse startMaintenance(Long id, Long staffId);
+    MaintenanceResponse rejectMaintenance(Long id, Long staffId, String remarks);
+    MaintenanceResponse resolveMaintenance(Long id, Long staffId, ResolveMaintenanceRequest request);
+    MaintenanceResponse verifyMaintenance(Long id, Long managerId);
     MaintenanceResponse updateMaintenanceStatus(Long id, UpdateMaintenanceStatusRequest request);
 
     // Breakage
