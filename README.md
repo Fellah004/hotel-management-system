@@ -40,10 +40,11 @@ The system follows a strict **16-microservice architecture** adhering to the **D
 10. **`rate-service`** (Port `8087`, DB: `rate_db`): Base rates, first-night and extension pricing, Dynamic Pricing Engine.
 11. **`staff-service`** (Port `8088`, DB: `staff_db`): Staff employee profiles, shift schedules, attendance clock-in/out, leave approvals, salary/NIC masking.
 12. **`inventory-service`** (Port `8089`, DB: `inventory_db`): Stock levels, atomic stock in/out/adjustments, optimistic locking, threshold breach detection.
-13. **`guest-experience-service`** (Port `8090`, DB: `guest_experience_db`): Guest service requests, QR room service, stay feedback, complaints handling, loyalty tier points ledger.
-14. **`operations-service`** (Port `8091`, DB: `operations_db`): Housekeeper room-range assignments, housekeeping task lifecycle, maintenance tickets, breakage approvals, expenses, utilities, cash drawer reconciliation, shift handover.
-15. **`reporting-service`** (Port `8092`, DB: `reporting_db`): Occupancy analytics, revenue streams, staff performance metrics, automated scheduled daily hotel summaries.
-16. **`notification-service`** (Port `8093`, DB: `notification_db`): Event consumer, notification store, multi-channel classification (`EMAIL`, `SMS`, `IN_APP`).
+13. **`purchase-service`** (Port 8094, DB: purchase_db): Purchase requests, supplier management, supplier quotations, purchase orders, goods receipt management, purchase approvals/rejections, purchase audit logs, inventory integration, and purchase event processing.
+14. **`guest-experience-service`** (Port `8090`, DB: `guest_experience_db`): Guest service requests, QR room service, stay feedback, complaints handling, loyalty tier points ledger.
+15. **`operations-service`** (Port `8091`, DB: `operations_db`): Housekeeper room-range assignments, housekeeping task lifecycle, maintenance tickets, breakage approvals, expenses, utilities, cash drawer reconciliation, shift handover.
+16. **`reporting-service`** (Port `8092`, DB: `reporting_db`): Occupancy analytics, revenue streams, staff performance metrics, automated scheduled daily hotel summaries.
+17. **`notification-service`** (Port `8093`, DB: `notification_db`): Event consumer, notification store, multi-channel classification (`EMAIL`, `SMS`, `IN_APP`).
 
 ---
 
