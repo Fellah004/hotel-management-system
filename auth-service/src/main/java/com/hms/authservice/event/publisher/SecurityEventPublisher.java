@@ -41,6 +41,10 @@ public class SecurityEventPublisher {
                 .build();
 
         log.warn("Publishing AccountLocked event for user: {}", username);
-        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_NAME, "hms.security.account-locked", event);
+        try {
+            rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_NAME, "hms.security.account-locked", event);
+        } catch (Exception ex) {
+            log.warn("Failed to publish AccountLocked event to RabbitMQ (Broker might be offline): {}", ex.getMessage());
+        }
     }
 }

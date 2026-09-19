@@ -28,6 +28,9 @@ public class GuestServiceImpl implements GuestService {
     @Override
     @Transactional
     public GuestResponse createGuest(CreateGuestRequest request) {
+        if (request.getUserId() != null && guestRepository.findByUserId(request.getUserId()).isPresent()) {
+            throw new DuplicateResourceException("Guest profile already exists for user ID: " + request.getUserId());
+        }
         if (guestRepository.existsByEmail(request.getEmail())) {
             throw new DuplicateResourceException("Guest with email already exists: " + request.getEmail());
         }
