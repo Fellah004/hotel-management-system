@@ -1,2 +1,0 @@
-package com.hms.reporting.entity;
-public enum ReportType { OCCUPANCY, REVENUE, EXPENSE, PROFIT, STAFF_PERFORMANCE, DAILY_SUMMARY, PEAK_BOOKING, LOW_STOCK }
