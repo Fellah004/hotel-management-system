@@ -19,11 +19,11 @@ The Online Hotel Management System (HMS) is a distributed, event-driven hotel op
 ---
 
 ## 3. Architecture
-The system follows a strict **16-microservice architecture** adhering to the **Database-per-Service** design pattern. Synchronous operations use **Spring Cloud OpenFeign** with **Resilience4j** circuit breakers, while asynchronous operations use **RabbitMQ** topic exchanges with event envelope standardization and consumer idempotency.
+The system follows a strict **17-microservice architecture** adhering to the **Database-per-Service** design pattern. Synchronous operations use **Spring Cloud OpenFeign** with **Resilience4j** circuit breakers, while asynchronous operations use **RabbitMQ** topic exchanges with event envelope standardization and consumer idempotency.
 
 ---
 
-## 4. Microservices (Exactly 16 Services)
+## 4. Microservices (Exactly 17 Services)
 
 ### Infrastructure Services
 1. **`config-server`** (Port `8888`): Centralized Git/native configuration repository.
